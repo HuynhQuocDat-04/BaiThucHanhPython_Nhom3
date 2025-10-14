@@ -1,0 +1,16 @@
+{
+    "users": [
+        {
+            "id": 1,
+            "username": "dat",
+            "password": "123123",
+            "email": "",
+            "level": 1,
+            "score": 0,
+            "coins": 0,
+            "lives": 3,
+            "created_at": "2025-10-14 14:22:17",
+            "last_login": "2025-10-14 14:27:02"
+        }
+    ]
+}

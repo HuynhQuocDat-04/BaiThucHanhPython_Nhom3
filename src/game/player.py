@@ -2,6 +2,8 @@ import pygame
 import os
 import time
 from game.fireball import Fireball
+from game.config import GAME_SETTINGS
+from game.config import GAME_SETTINGS
 
 
 class Player:
@@ -24,6 +26,12 @@ class Player:
         self.special_active = False
         self.special_timer = 0
         self.special_direction = 1
+        
+        # Input timing để tránh nhập nhảy
+        self.last_jump_time = 0
+        self.jump_cooldown = GAME_SETTINGS["JUMP_COOLDOWN"]
+        self.movement_speed = GAME_SETTINGS["MOVEMENT_SPEED"]
+        self.jump_speed = GAME_SETTINGS["JUMP_SPEED"]
 
         self.sprites_walk = []
         self.sprites_stand = []
@@ -479,23 +487,25 @@ class Player:
             return
 
         if keys[pygame.K_LEFT]:
-            dx -= 5
+            dx -= self.movement_speed
             moving = True
             self.facing_right = False
+            self.direction = -1
 
         if keys[pygame.K_RIGHT]:
-            dx += 5
+            dx += self.movement_speed
             moving = True
             self.facing_right = True
-
-        if keys[pygame.K_SPACE] and self.on_ground:
-            self.vel_y = -15
-            self.on_ground = False
-
-        if keys[pygame.K_LEFT]:
-            self.direction = -1
-        if keys[pygame.K_RIGHT]:
             self.direction = 1
+
+        # Nhảy với cooldown để tránh nhập nhảy
+        current_time = pygame.time.get_ticks()
+        if keys[pygame.K_SPACE] and self.on_ground and current_time - self.last_jump_time > self.jump_cooldown:
+            self.vel_y = self.jump_speed
+            self.on_ground = False
+            self.last_jump_time = current_time
+
+
 
         if self.special_active:
             self.special_timer -= 1

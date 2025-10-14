@@ -54,6 +54,7 @@ class Enemy(pygame.sprite.Sprite):
         # Kiểm tra trạng thái chết
         if self.health <= 0 and not self.is_dead:
             self.is_dead = True
+
             self.death_timer = 15  # 15 frame = 0.25 giây để hiển thị damage text
         
         if self.is_dead:

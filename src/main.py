@@ -8,6 +8,9 @@ from game.projectile import Projectile
 from game.coin import Coin  
 from game.dialogue import DialogueSystem
 from game.npc import NPC
+from game.login_screen import LoginScreen
+from game.auth_manager import AuthManager
+from game.config import GAME_SETTINGS
 import os
 
 # Initialize Pygame
@@ -256,8 +259,37 @@ def restore_box_used(level, current_level):
                 plat.used = box_used_per_level[current_level][idx]
                 idx += 1
 
+def init_game():
+    """Khởi tạo game sau khi đăng nhập thành công"""
+    global current_level, level, enemies, player, items, coin_count, selected_weapon, killed_enemies_per_level
+    
+    # Reset game state
+    current_level = 0
+    coin_count = 0
+    # Giữ selected_weapon là chỉ số (int) tương ứng với weapon_types
+    selected_weapon = 0
+    
+    # Khởi tạo lại player
+    small_platform = level_data_list[0][1]
+    player_x = small_platform['x'] + 10
+    player_y = small_platform['y'] - 55
+    player = Player(player_x, player_y)
+    
+    # Khởi tạo lại level và enemies
+    level = Level(level_data_list[current_level])
+    enemies = get_enemies_for_level(current_level)
+    items = []
+    
+    # Reset killed enemies
+    killed_enemies_per_level = [set() for _ in range(len(level_data_list))]
+
 def main():
     global current_level, level, enemies, player, items, coin_count, selected_weapon, killed_enemies_per_level
+    
+    # Khởi tạo màn hình đăng nhập
+    login_screen = LoginScreen(screen_width, screen_height)
+    show_login = True
+    
     attack_cooldown = 0
     coin_count = 0
     game_over = False
@@ -291,6 +323,16 @@ def main():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
+
+            # Xử lý màn hình đăng nhập (ƯU TIÊN CAO NHẤT)
+            if show_login:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+                
+                login_screen.handle_event(event)
+
+            # (ĐÃ DI CHUYỂN) Vẽ màn hình đăng nhập ra ngoài event loop để render mỗi frame
 
             # Xử lý lựa chọn của player sau khi NPC hỏi xong (ƯU TIÊN NHẤT)
             if player_choice_mode:
@@ -334,6 +376,9 @@ def main():
                     mouse_pos = pygame.mouse.get_pos()
                     if play_rect and play_rect.collidepoint(mouse_pos):
                         show_start_screen = False
+                        # Bảo vệ selected_weapon nếu bị lệch state
+                        if not isinstance(selected_weapon, int) or not (0 <= selected_weapon < len(weapon_types)):
+                            selected_weapon = 0
                         player.weapon_type = weapon_types[selected_weapon]["name"]
                         # Bắt đầu hội thoại của NPC và cho NPC xuất hiện
                         npc_visible = True
@@ -348,6 +393,8 @@ def main():
                         current_level = 0
                         level = Level(level_data_list[current_level])
                         player = Player(100, 400)
+                        if not isinstance(selected_weapon, int) or not (0 <= selected_weapon < len(weapon_types)):
+                            selected_weapon = 0
                         player.weapon_type = weapon_types[selected_weapon]["name"]
                         # Reset danh sách enemies đã chết
                         killed_enemies_per_level = [set() for _ in range(len(level_data_list))]
@@ -371,13 +418,24 @@ def main():
                 if event.type == pygame.KEYUP and event.key == pygame.K_z:
                     player.attack_key_held = False
 
+        # Vẽ màn hình đăng nhập NGOÀI event loop (render mỗi frame, không phụ thuộc event)
+        if show_login:
+            if login_screen.auth_manager.is_logged_in():
+                show_login = False
+                init_game()
+            else:
+                login_screen.draw(screen)
+                pygame.display.flip()
+                clock.tick(GAME_SETTINGS["FPS"])
+                continue
+
         if show_start_screen:
             screen.fill((135, 206, 235))
             for cloud in clouds:
                 screen.blit(cloud["img"], (cloud["x"], cloud["y"]))
             play_rect, btn_rect, weapon_rects = draw_start_screen(screen, show_weapon_select)
             pygame.display.flip()
-            clock.tick(60)
+            clock.tick(GAME_SETTINGS["FPS"])
             continue
 
         if not game_over:
@@ -544,6 +602,15 @@ def main():
         play_rect = None
         if player.health <= 0:
             game_over = True
+            # Cập nhật điểm số cho user
+            if login_screen.auth_manager.is_logged_in():
+                current_score = coin_count * 100 + current_level * 500
+                login_screen.auth_manager.update_user_progress(
+                    level=current_level + 1,
+                    score=current_score,
+                    coins=coin_count,
+                    lives=player.health
+                )
             retry_rect, btn_rect, weapon_rects = draw_game_over(screen, show_weapon_select)
         elif show_start_screen:
             play_rect, btn_rect, weapon_rects = draw_start_screen(screen, show_weapon_select)
@@ -552,7 +619,7 @@ def main():
         dialogue_system.render(screen)
 
         pygame.display.flip()
-        clock.tick(60)
+        clock.tick(GAME_SETTINGS["FPS"])
 
 if __name__ == "__main__":
     main()
