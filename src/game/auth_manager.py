@@ -72,10 +72,8 @@ class AuthManager:
             "username": username,
             "password": password,  # Trong thực tế nên mã hóa: self.hash_password(password)
             "email": email,
-            "level": 1,
             "score": 0,
             "coins": 0,
-            "lives": 3,
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "last_login": ""
         }
@@ -112,8 +110,8 @@ class AuthManager:
                 return user
         return None
     
-    def update_user_progress(self, level=None, score=None, coins=None, lives=None):
-        """Cập nhật tiến trình của user hiện tại"""
+    def update_user_progress(self, score=None, coins=None):
+        """Cập nhật tiến trình của user hiện tại (không còn dùng level và lives)."""
         if not self.current_user:
             return False
         
@@ -121,14 +119,10 @@ class AuthManager:
         if not user:
             return False
         
-        if level is not None:
-            user["level"] = max(user["level"], level)  # Chỉ cập nhật nếu level cao hơn
         if score is not None:
             user["score"] = max(user["score"], score)  # Chỉ cập nhật nếu score cao hơn
         if coins is not None:
             user["coins"] = coins
-        if lives is not None:
-            user["lives"] = lives
         
         self.current_user = user
         self.save_accounts()
@@ -146,3 +140,44 @@ class AuthManager:
         """Lấy bảng xếp hạng theo điểm số"""
         users = sorted(self.accounts_data["users"], key=lambda x: x["score"], reverse=True)
         return users[:limit]
+
+    def add_score(self, points: int) -> bool:
+        """Cộng thêm điểm vào tài khoản đang đăng nhập và lưu vào JSON.
+
+        Trả về True nếu cập nhật thành công, False nếu chưa đăng nhập hoặc lỗi.
+        """
+        try:
+            if not self.current_user:
+                return False
+            user = self.find_user_by_username(self.current_user["username"])
+            if not user:
+                return False
+            # Bảo vệ kiểu dữ liệu
+            current = int(user.get("score", 0) or 0)
+            delta = int(points or 0)
+            user["score"] = max(0, current + delta)
+            self.current_user = user
+            self.save_accounts()
+            return True
+        except Exception as _:
+            return False
+
+    def add_coins(self, amount: int) -> bool:
+        """Cộng thêm xu vào tài khoản đang đăng nhập và lưu JSON ngay.
+
+        Trả về True nếu thành công, False nếu chưa đăng nhập hoặc lỗi.
+        """
+        try:
+            if not self.current_user:
+                return False
+            user = self.find_user_by_username(self.current_user["username"])
+            if not user:
+                return False
+            current = int(user.get("coins", 0) or 0)
+            delta = int(amount or 0)
+            user["coins"] = max(0, current + delta)
+            self.current_user = user
+            self.save_accounts()
+            return True
+        except Exception:
+            return False

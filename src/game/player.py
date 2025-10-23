@@ -892,7 +892,12 @@ class Player:
                     img = pygame.transform.flip(img, True, False)
                 screen.blit(img, (draw_x, draw_y))
 
-        font = pygame.font.SysFont(None, 32)
+        # Dùng font Unicode để hiển thị ổn định (Tiếng Việt/ký tự có dấu)
+        font_path_hp = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "fonts", "DejaVuSans.ttf")
+        try:
+            font = pygame.font.Font(font_path_hp, 20)
+        except:
+            font = pygame.font.SysFont(None, 20)
         health_text = font.render(f'HP: {self.health}', True, (255, 255, 255))
         screen.blit(health_text, (10, 10))
 

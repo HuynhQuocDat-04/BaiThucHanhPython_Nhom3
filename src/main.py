@@ -20,7 +20,7 @@ pygame.init()
 screen_width = 800
 screen_height = 600
 screen = pygame.display.set_mode((screen_width, screen_height))
-pygame.display.set_caption("Dũng Sĩ Diệt Rồng")
+pygame.display.set_caption("Dũng Sĩ Đầu Nấm")
 
 # Load background clouds
 base_path = os.path.join(os.path.dirname(__file__), "assets", "other")
@@ -151,6 +151,13 @@ def draw_game_over(screen, show_weapon_select):
     pygame.draw.rect(screen, (255, 255, 0), btn_rect, border_radius=8)
     screen.blit(text_btn, text_btn.get_rect(center=btn_rect.center))
 
+    # Leaderboard button (dùng font nhỏ hơn để vừa trong nút)
+    font_btn_small = pygame.font.Font(font_path, 24)
+    text_leaderboard = font_btn_small.render("Bảng Xếp Hạng", True, (0, 0, 0))
+    leaderboard_btn_rect = pygame.Rect(screen.get_width()//2 - 100, 420, 200, 50)
+    pygame.draw.rect(screen, (100, 200, 255), leaderboard_btn_rect, border_radius=8)
+    screen.blit(text_leaderboard, text_leaderboard.get_rect(center=leaderboard_btn_rect.center))
+
     weapon_rects = []
     if show_weapon_select:
         # Large overlay for weapon selection
@@ -185,7 +192,7 @@ def draw_game_over(screen, show_weapon_select):
             pygame.draw.rect(screen, border_color, rect, 4)
             screen.blit(img, rect.topleft)
             weapon_rects.append(rect)
-    return retry_rect, btn_rect, weapon_rects
+    return retry_rect, btn_rect, weapon_rects, leaderboard_btn_rect
 
 def draw_start_screen(screen, show_weapon_select):
     overlay = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
@@ -196,7 +203,7 @@ def draw_start_screen(screen, show_weapon_select):
     font_path = os.path.join(os.path.dirname(__file__), "assets", "fonts", "DejaVuSans.ttf")
     font_big = pygame.font.Font(font_path, 70)
     font_small = pygame.font.Font(font_path, 48)
-    text_title = font_big.render("DŨNG SĨ DIỆT RỒNG", True, (255, 255, 0))
+    text_title = font_big.render("DŨNG SĨ ĐẦU NẤM", True, (255, 255, 0))
     text_play = font_small.render("Chơi", True, (255, 255, 255))
 
     screen.blit(text_title, (screen.get_width()//2 - text_title.get_width()//2, 180))
@@ -209,6 +216,13 @@ def draw_start_screen(screen, show_weapon_select):
     btn_rect = pygame.Rect(screen.get_width()//2 - 100, 360, 200, 50)
     pygame.draw.rect(screen, (255, 255, 0), btn_rect, border_radius=8)
     screen.blit(text_btn, text_btn.get_rect(center=btn_rect.center))
+
+    # Leaderboard button (dùng font nhỏ hơn để vừa trong nút)
+    font_btn_small = pygame.font.Font(font_path, 24)
+    text_leaderboard = font_btn_small.render("Bảng Xếp Hạng", True, (0, 0, 0))
+    leaderboard_btn_rect = pygame.Rect(screen.get_width()//2 - 100, 420, 200, 50)
+    pygame.draw.rect(screen, (100, 200, 255), leaderboard_btn_rect, border_radius=8)
+    screen.blit(text_leaderboard, text_leaderboard.get_rect(center=leaderboard_btn_rect.center))
 
     weapon_rects = []
     if show_weapon_select:
@@ -241,7 +255,77 @@ def draw_start_screen(screen, show_weapon_select):
             pygame.draw.rect(screen, border_color, rect, 4)
             screen.blit(img, rect.topleft)
             weapon_rects.append(rect)
-    return play_rect, btn_rect, weapon_rects
+    return play_rect, btn_rect, weapon_rects, leaderboard_btn_rect
+
+def draw_leaderboard(screen, auth_manager):
+    """Vẽ bảng xếp hạng với danh sách người chơi theo điểm số từ cao đến thấp"""
+    # Overlay tối
+    overlay = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 220))
+    screen.blit(overlay, (0, 0))
+    
+    font_path = os.path.join(os.path.dirname(__file__), "assets", "fonts", "DejaVuSans.ttf")
+    
+    # Panel chính
+    panel_width = 500
+    panel_height = 450
+    panel_rect = pygame.Rect(
+        (screen.get_width() - panel_width) // 2,
+        (screen.get_height() - panel_height) // 2,
+        panel_width,
+        panel_height
+    )
+    pygame.draw.rect(screen, (240, 240, 250), panel_rect, border_radius=16)
+    pygame.draw.rect(screen, (100, 100, 150), panel_rect, 4, border_radius=16)
+    
+    # Tiêu đề
+    font_title = pygame.font.Font(font_path, 48)
+    text_title = font_title.render("BẢNG XẾP HẠNG", True, (50, 50, 150))
+    screen.blit(text_title, (panel_rect.centerx - text_title.get_width()//2, panel_rect.y + 20))
+    
+    # Lấy danh sách người chơi từ auth_manager
+    leaderboard = auth_manager.get_leaderboard(limit=10)
+    
+    # Hiển thị danh sách
+    font_list = pygame.font.Font(font_path, 24)
+    font_rank = pygame.font.Font(font_path, 28)
+    start_y = panel_rect.y + 90
+    line_height = 32
+    
+    for i, user in enumerate(leaderboard):
+        rank = i + 1
+        username = user.get("username", "Unknown")
+        score = user.get("score", 0)
+        
+        # Màu cho top 3
+        if rank == 1:
+            rank_color = (255, 215, 0)  # Vàng
+        elif rank == 2:
+            rank_color = (192, 192, 192)  # Bạc
+        elif rank == 3:
+            rank_color = (205, 127, 50)  # Đồng
+        else:
+            rank_color = (80, 80, 80)
+        
+        # Render hạng
+        text_rank = font_rank.render(f"#{rank}", True, rank_color)
+        screen.blit(text_rank, (panel_rect.x + 30, start_y + i * line_height))
+        
+        # Render username
+        text_username = font_list.render(username, True, (0, 0, 0))
+        screen.blit(text_username, (panel_rect.x + 100, start_y + i * line_height + 2))
+        
+        # Render score
+        text_score = font_list.render(f"{score}", True, (0, 100, 0))
+        screen.blit(text_score, (panel_rect.x + panel_width - 100, start_y + i * line_height + 2))
+    
+    # Nút đóng
+    font_btn = pygame.font.Font(font_path, 28)
+    text_close = font_btn.render("Đóng (ESC)", True, (255, 255, 255))
+    close_rect = text_close.get_rect(center=(panel_rect.centerx, panel_rect.bottom - 30))
+    screen.blit(text_close, close_rect)
+    
+    return close_rect
 
 def save_box_used(level, current_level):
     # Lưu trạng thái các box đã dùng (ví dụ: các hộp đã lấy item)
@@ -261,11 +345,12 @@ def restore_box_used(level, current_level):
 
 def init_game():
     """Khởi tạo game sau khi đăng nhập thành công"""
-    global current_level, level, enemies, player, items, coin_count, selected_weapon, killed_enemies_per_level
+    global current_level, level, enemies, player, items, coin_count, player_score, selected_weapon, killed_enemies_per_level
     
     # Reset game state
     current_level = 0
     coin_count = 0
+    player_score = 0
     # Giữ selected_weapon là chỉ số (int) tương ứng với weapon_types
     selected_weapon = 0
     
@@ -284,7 +369,7 @@ def init_game():
     killed_enemies_per_level = [set() for _ in range(len(level_data_list))]
 
 def main():
-    global current_level, level, enemies, player, items, coin_count, selected_weapon, killed_enemies_per_level
+    global current_level, level, enemies, player, items, coin_count, player_score, selected_weapon, killed_enemies_per_level
     
     # Khởi tạo màn hình đăng nhập
     login_screen = LoginScreen(screen_width, screen_height)
@@ -292,6 +377,7 @@ def main():
     
     attack_cooldown = 0
     coin_count = 0
+    player_score = 0
     game_over = False
     retry_rect = None
     weapon_rects = []
@@ -299,7 +385,8 @@ def main():
     btn_rect = None
     show_start_screen = True
     play_rect = None
-    
+    show_leaderboard = False
+    leaderboard_btn_rect = None
 
     # Tạo dialogue system
     dialogue_system = DialogueSystem()
@@ -347,6 +434,11 @@ def main():
                         player_choice_mode = False
                         dialogue_system.end_dialogue()
                         player.health = 0
+                    elif event.key == pygame.K_z:
+                        # Cho phép nhấn Z (tấn công) để chấp nhận nhanh và tiếp tục game
+                        player_choice_mode = False
+                        npc_visible = False
+                        dialogue_system.end_dialogue()
                 # KHÔNG continue ở đây, để các event khác vẫn được xử lý (chỉ dừng update game logic bên dưới)
 
             # Ưu tiên xử lý dialogue nếu đang active
@@ -368,25 +460,50 @@ def main():
                         if rect.collidepoint(mouse_pos):
                             selected_weapon = i
                             show_weapon_select = False
+                            player.weapon_type = weapon_types[selected_weapon]["name"]
                 # Khi bảng chọn vũ khí hiện, không xử lý các nút khác!
                 continue
 
+            # Xử lý bảng xếp hạng: ESC hoặc click chuột sẽ đóng overlay, ưu tiên cao
+            if show_leaderboard:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    show_leaderboard = False
+                    continue
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    show_leaderboard = False
+                    continue
+
+            # Xử lý click ở màn hình Start
             if show_start_screen:
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     mouse_pos = pygame.mouse.get_pos()
                     if play_rect and play_rect.collidepoint(mouse_pos):
                         show_start_screen = False
+                        # Tắt mọi overlay có thể còn treo
+                        show_weapon_select = False
+                        show_leaderboard = False
                         # Bảo vệ selected_weapon nếu bị lệch state
                         if not isinstance(selected_weapon, int) or not (0 <= selected_weapon < len(weapon_types)):
                             selected_weapon = 0
                         player.weapon_type = weapon_types[selected_weapon]["name"]
-                        # Bắt đầu hội thoại của NPC và cho NPC xuất hiện
+                        # Reset trạng thái tấn công
+                        player.is_attacking = False
+                        player.attack_stage = 0
+                        player.machate_attack_stage = 0
+                        player.attack_key_held = False
+                        # Bắt đầu hội thoại NPC
                         npc_visible = True
                         dialogue_system.start_dialogue(npc_intro_dialogue, npc.rect)
                         started_npc_dialogue = True
                     elif btn_rect and btn_rect.collidepoint(mouse_pos):
                         show_weapon_select = not show_weapon_select
-            elif game_over:
+                    elif leaderboard_btn_rect and leaderboard_btn_rect.collidepoint(mouse_pos):
+                        show_leaderboard = True
+                # Khi đang ở start screen, không xử lý gameplay input
+                continue
+
+            # Xử lý click ở màn hình Game Over
+            if game_over:
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     mouse_pos = pygame.mouse.get_pos()
                     if retry_rect and retry_rect.collidepoint(mouse_pos):
@@ -396,7 +513,15 @@ def main():
                         if not isinstance(selected_weapon, int) or not (0 <= selected_weapon < len(weapon_types)):
                             selected_weapon = 0
                         player.weapon_type = weapon_types[selected_weapon]["name"]
-                        # Reset danh sách enemies đã chết
+                        # Tắt mọi overlay có thể còn treo
+                        show_weapon_select = False
+                        show_leaderboard = False
+                        # Reset trạng thái tấn công
+                        player.is_attacking = False
+                        player.attack_stage = 0
+                        player.machate_attack_stage = 0
+                        player.attack_key_held = False
+                        # Reset enemies/boxes/items
                         killed_enemies_per_level = [set() for _ in range(len(level_data_list))]
                         enemies = get_enemies_for_level(current_level)
                         game_over = False
@@ -406,23 +531,39 @@ def main():
                         restore_box_used(level, current_level)
                         items = items_per_level[current_level]
                         show_weapon_select = False
-                        # NPC sẽ biến mất hoàn toàn khi chơi lại
                         npc_visible = False
                         started_npc_dialogue = False
                     elif btn_rect and btn_rect.collidepoint(mouse_pos):
                         show_weapon_select = not show_weapon_select
-            else:
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_z:
-                    player.attack()
-                    player.attack_key_held = True
-                if event.type == pygame.KEYUP and event.key == pygame.K_z:
-                    player.attack_key_held = False
+                        if not show_weapon_select:
+                            player.weapon_type = weapon_types[selected_weapon]["name"]
+                            player.is_attacking = False
+                            player.attack_stage = 0
+                            player.machate_attack_stage = 0
+                            player.attack_key_held = False
+                    elif leaderboard_btn_rect and leaderboard_btn_rect.collidepoint(mouse_pos):
+                        show_leaderboard = True
+                # Khi đang ở game over, không xử lý gameplay input
+                continue
+
+            # Gameplay: xử lý phím tấn công Z
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_z:
+                player.attack()
+                player.attack_key_held = True
+            if event.type == pygame.KEYUP and event.key == pygame.K_z:
+                player.attack_key_held = False
+
+
+        # (đã chuyển xử lý leaderboard vào trong event loop ở trên)
+
+        # (đã chuyển xử lý click start/game over và phím Z vào trong vòng lặp sự kiện ở trên)
 
         # Vẽ màn hình đăng nhập NGOÀI event loop (render mỗi frame, không phụ thuộc event)
         if show_login:
             if login_screen.auth_manager.is_logged_in():
                 show_login = False
-                init_game()
+                init_game()  # Đảm bảo reset toàn bộ trạng thái game
+                # KHÔNG dùng continue ở đây để chuyển sang game ngay
             else:
                 login_screen.draw(screen)
                 pygame.display.flip()
@@ -433,7 +574,9 @@ def main():
             screen.fill((135, 206, 235))
             for cloud in clouds:
                 screen.blit(cloud["img"], (cloud["x"], cloud["y"]))
-            play_rect, btn_rect, weapon_rects = draw_start_screen(screen, show_weapon_select)
+            play_rect, btn_rect, weapon_rects, leaderboard_btn_rect = draw_start_screen(screen, show_weapon_select)
+            if show_leaderboard:
+                draw_leaderboard(screen, login_screen.auth_manager)
             pygame.display.flip()
             clock.tick(GAME_SETTINGS["FPS"])
             continue
@@ -475,6 +618,11 @@ def main():
                         # Lưu index của enemy đã chết
                         if hasattr(enemy, 'original_index'):
                             killed_enemies_per_level[current_level].add(enemy.original_index)
+                        # Cộng điểm khi hạ gục enemy
+                        player_score += 50
+                        # Lưu điểm ngay vào tài khoản (nếu đã đăng nhập)
+                        if login_screen.auth_manager.is_logged_in():
+                            login_screen.auth_manager.add_score(50)
                         enemies.remove(enemy)
                         continue
                     # Nếu player đang tấn công bằng Shield, enemy không thể đi xuyên player
@@ -587,6 +735,12 @@ def main():
             if item.active and player.rect.colliderect(item.rect) and not item.rising:
                 if hasattr(item, "sheet"):
                     coin_count += 1
+                    # Cộng điểm trực tiếp theo quy tắc hiện tại (100 điểm mỗi coin)
+                    player_score += 100
+                    if login_screen.auth_manager.is_logged_in():
+                        login_screen.auth_manager.add_score(100)
+                        # Cập nhật xu cho tài khoản ngay khi nhặt coin
+                        login_screen.auth_manager.add_coins(1)
                     item.active = False
                 else:
                     player.health = min(player.health + 50, 100)
@@ -596,22 +750,26 @@ def main():
         font = pygame.font.Font(font_path, 32)
         coin_text = font.render(f"Xu: {coin_count}", True, (255, 215, 0))
         screen.blit(coin_text, (700, 20))
+        # Hiển thị điểm ngay cạnh Xu
+        score_text = font.render(f"Điểm: {player_score}", True, (255, 255, 255))
+        # Đặt bên trái coin_text một chút
+        score_x = 700 - score_text.get_width() - 20
+        screen.blit(score_text, (score_x, 20))
 
         retry_rect = None
         btn_rect = None
         play_rect = None
         if player.health <= 0:
             game_over = True
-            # Cập nhật điểm số cho user
+            # Cập nhật điểm/xu cho user (không dùng level nữa)
             if login_screen.auth_manager.is_logged_in():
-                current_score = coin_count * 100 + current_level * 500
+                current_score = player_score + coin_count * 100
                 login_screen.auth_manager.update_user_progress(
-                    level=current_level + 1,
-                    score=current_score,
-                    coins=coin_count,
-                    lives=player.health
+                    score=current_score
                 )
-            retry_rect, btn_rect, weapon_rects = draw_game_over(screen, show_weapon_select)
+            retry_rect, btn_rect, weapon_rects, leaderboard_btn_rect = draw_game_over(screen, show_weapon_select)
+            if show_leaderboard:
+                draw_leaderboard(screen, login_screen.auth_manager)
         elif show_start_screen:
             play_rect, btn_rect, weapon_rects = draw_start_screen(screen, show_weapon_select)
 
