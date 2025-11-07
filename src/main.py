@@ -12,6 +12,7 @@ from game.login_screen import LoginScreen
 from game.auth_manager import AuthManager
 from game.config import GAME_SETTINGS
 from game.boss import Boss
+from game.weapon_shop import WeaponShop
 import os
 
 # Initialize Pygame
@@ -146,7 +147,7 @@ weapon_types = [
 ]   
 selected_weapon = 0
 
-def draw_game_over(screen, show_weapon_select):
+def draw_game_over(screen, show_weapon_select, auth_manager=None):
     # Overlay
     overlay = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 180))
@@ -206,9 +207,27 @@ def draw_game_over(screen, show_weapon_select):
         for i, w in enumerate(weapon_types):
             rect = pygame.Rect(start_x + i*70, y, 60, 60)
             img = pygame.transform.scale(w["img"], (60, 60))
-            border_color = (255, 0, 0) if i == selected_weapon else (180, 180, 180)
+            
+            # Kiểm tra vũ khí đã mở khóa chưa
+            is_unlocked = True
+            if auth_manager:
+                is_unlocked = auth_manager.is_weapon_unlocked(i)
+            
+            # Nếu chưa mở khóa, vẽ overlay tối (không hiển thị biểu tượng khóa)
+            if not is_unlocked:
+                # Vẽ overlay tối lên vũ khí
+                gray_overlay = pygame.Surface((60, 60), pygame.SRCALPHA)
+                gray_overlay.fill((0, 0, 0, 180))
+                screen.blit(img, rect.topleft)
+                screen.blit(gray_overlay, rect.topleft)
+                
+                # Viền xám cho vũ khí bị khóa
+                border_color = (100, 100, 100)
+            else:
+                screen.blit(img, rect.topleft)
+                border_color = (255, 0, 0) if i == selected_weapon else (180, 180, 180)
+            
             pygame.draw.rect(screen, border_color, rect, 4)
-            screen.blit(img, rect.topleft)
             weapon_rects.append(rect)
     return retry_rect, btn_rect, weapon_rects, leaderboard_btn_rect
 
@@ -230,7 +249,7 @@ def draw_victory_overlay(screen):
     screen.blit(text_btn, text_btn.get_rect(center=btn_rect.center))
     return btn_rect
 
-def draw_start_screen(screen, show_weapon_select):
+def draw_start_screen(screen, show_weapon_select, auth_manager=None):
     overlay = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 180))
     screen.blit(overlay, (0, 0))
@@ -247,16 +266,23 @@ def draw_start_screen(screen, show_weapon_select):
     screen.blit(text_play, play_rect)
 
     # Weapon select button
-    font_btn = pygame.font.Font(font_path, 32)
+    font_btn = pygame.font.Font(font_path, 25)
     text_btn = font_btn.render("Chọn Vũ Khí", True, (0, 0, 0))
     btn_rect = pygame.Rect(screen.get_width()//2 - 100, 360, 200, 50)
     pygame.draw.rect(screen, (255, 255, 0), btn_rect, border_radius=8)
     screen.blit(text_btn, text_btn.get_rect(center=btn_rect.center))
 
+    # Weapon shop button
+    font_btn_shop = pygame.font.Font(font_path, 23)
+    text_shop = font_btn_shop.render("Cửa Hàng Vũ Khí", True, (0, 0, 0))
+    weapon_shop_btn_rect = pygame.Rect(screen.get_width()//2 - 100, 420, 200, 50)
+    pygame.draw.rect(screen, (255, 200, 100), weapon_shop_btn_rect, border_radius=8)
+    screen.blit(text_shop, text_shop.get_rect(center=weapon_shop_btn_rect.center))
+
     # Leaderboard button (dùng font nhỏ hơn để vừa trong nút)
     font_btn_small = pygame.font.Font(font_path, 24)
     text_leaderboard = font_btn_small.render("Bảng Xếp Hạng", True, (0, 0, 0))
-    leaderboard_btn_rect = pygame.Rect(screen.get_width()//2 - 100, 420, 200, 50)
+    leaderboard_btn_rect = pygame.Rect(screen.get_width()//2 - 100, 480, 200, 50)
     pygame.draw.rect(screen, (100, 200, 255), leaderboard_btn_rect, border_radius=8)
     screen.blit(text_leaderboard, text_leaderboard.get_rect(center=leaderboard_btn_rect.center))
 
@@ -287,11 +313,29 @@ def draw_start_screen(screen, show_weapon_select):
         for i, w in enumerate(weapon_types):
             rect = pygame.Rect(start_x + i*70, y, 60, 60)
             img = pygame.transform.scale(w["img"], (60, 60))
-            border_color = (255, 0, 0) if i == selected_weapon else (180, 180, 180)
+            
+            # Kiểm tra vũ khí đã mở khóa chưa
+            is_unlocked = True
+            if auth_manager:
+                is_unlocked = auth_manager.is_weapon_unlocked(i)
+            
+            # Nếu chưa mở khóa, vẽ overlay tối (không hiển thị biểu tượng khóa)
+            if not is_unlocked:
+                # Vẽ overlay tối lên vũ khí
+                gray_overlay = pygame.Surface((60, 60), pygame.SRCALPHA)
+                gray_overlay.fill((0, 0, 0, 180))
+                screen.blit(img, rect.topleft)
+                screen.blit(gray_overlay, rect.topleft)
+                
+                # Viền xám cho vũ khí bị khóa
+                border_color = (100, 100, 100)
+            else:
+                screen.blit(img, rect.topleft)
+                border_color = (255, 0, 0) if i == selected_weapon else (180, 180, 180)
+            
             pygame.draw.rect(screen, border_color, rect, 4)
-            screen.blit(img, rect.topleft)
             weapon_rects.append(rect)
-    return play_rect, btn_rect, weapon_rects, leaderboard_btn_rect
+    return play_rect, btn_rect, weapon_rects, leaderboard_btn_rect, weapon_shop_btn_rect
 
 def draw_leaderboard(screen, auth_manager):
     """Vẽ bảng xếp hạng với danh sách người chơi theo điểm số từ cao đến thấp"""
@@ -413,6 +457,9 @@ def main():
     # Show login by default unless SKIP_LOGIN is set for testing
     show_login = not SKIP_LOGIN
     
+    # Khởi tạo weapon shop
+    weapon_shop = None
+    show_weapon_shop = False
     
     attack_cooldown = 0
     coin_count = 0
@@ -431,6 +478,7 @@ def main():
     leaderboard_btn_rect = None
     show_victory = False
     victory_btn_rect = None
+    weapon_shop_btn_rect = None  # Nút mở weapon shop
 
     # Tạo dialogue system
     dialogue_system = DialogueSystem()
@@ -464,6 +512,13 @@ def main():
                 login_screen.handle_event(event)
 
             # (ĐÃ DI CHUYỂN) Vẽ màn hình đăng nhập ra ngoài event loop để render mỗi frame
+
+            # Xử lý weapon shop (ƯU TIÊN CAO SAU LOGIN)
+            if show_weapon_shop and weapon_shop:
+                result = weapon_shop.handle_event(event)
+                if result == "back":
+                    show_weapon_shop = False
+                continue
 
             # Xử lý lựa chọn của player sau khi NPC hỏi xong (ƯU TIÊN NHẤT)
             if player_choice_mode:
@@ -502,9 +557,12 @@ def main():
                     mouse_pos = pygame.mouse.get_pos()
                     for i, rect in enumerate(weapon_rects):
                         if rect.collidepoint(mouse_pos):
-                            selected_weapon = i
-                            show_weapon_select = False
-                            player.weapon_type = weapon_types[selected_weapon]["name"]
+                            # Kiểm tra vũ khí đã mở khóa chưa
+                            if login_screen.auth_manager.is_weapon_unlocked(i):
+                                selected_weapon = i
+                                show_weapon_select = False
+                                player.weapon_type = weapon_types[selected_weapon]["name"]
+                            # Nếu chưa mở khóa, không làm gì (không cho chọn)
                 # Khi bảng chọn vũ khí hiện, không xử lý các nút khác!
                 continue
 
@@ -558,6 +616,10 @@ def main():
                         started_npc_dialogue = True
                     elif btn_rect and btn_rect.collidepoint(mouse_pos):
                         show_weapon_select = not show_weapon_select
+                    elif weapon_shop_btn_rect and weapon_shop_btn_rect.collidepoint(mouse_pos):
+                        show_weapon_shop = True
+                        if weapon_shop is None:
+                            weapon_shop = WeaponShop(screen, login_screen.auth_manager)
                     elif leaderboard_btn_rect and leaderboard_btn_rect.collidepoint(mouse_pos):
                         show_leaderboard = True
                 # Khi đang ở start screen, không xử lý gameplay input
@@ -602,6 +664,10 @@ def main():
                             player.attack_stage = 0
                             player.machate_attack_stage = 0
                             player.attack_key_held = False
+                    elif weapon_shop_btn_rect and weapon_shop_btn_rect.collidepoint(mouse_pos):
+                        show_weapon_shop = True
+                        if weapon_shop is None:
+                            weapon_shop = WeaponShop(screen, login_screen.auth_manager)
                     elif leaderboard_btn_rect and leaderboard_btn_rect.collidepoint(mouse_pos):
                         show_leaderboard = True
                 # Khi đang ở game over, không xử lý gameplay input
@@ -631,11 +697,18 @@ def main():
                 clock.tick(GAME_SETTINGS["FPS"])
                 continue
 
+        # Vẽ weapon shop nếu đang mở
+        if show_weapon_shop and weapon_shop:
+            weapon_shop.render()
+            pygame.display.flip()
+            clock.tick(GAME_SETTINGS["FPS"])
+            continue
+
         if show_start_screen:
             screen.fill((135, 206, 235))
             for cloud in clouds:
                 screen.blit(cloud["img"], (cloud["x"], cloud["y"]))
-            play_rect, btn_rect, weapon_rects, leaderboard_btn_rect = draw_start_screen(screen, show_weapon_select)
+            play_rect, btn_rect, weapon_rects, leaderboard_btn_rect, weapon_shop_btn_rect = draw_start_screen(screen, show_weapon_select, login_screen.auth_manager)
             if show_leaderboard:
                 draw_leaderboard(screen, login_screen.auth_manager)
             pygame.display.flip()
@@ -713,14 +786,17 @@ def main():
                                     hit_dict[enemy_id] = set()
                                 if stage not in hit_dict[enemy_id] and not enemy.invincible:
                                     knockback_dir = 1 if player.facing_right else -1
+                                    # Kiếm: 20 dame
                                     enemy.take_damage(20, knockback_dir)
                                     hit_dict[enemy_id].add(stage)
                             # Nếu đã trúng ở stage này thì bỏ qua
                         else:
-                            # Martial, Shield: giữ logic cũ
+                            # Martial (tay không) 10 dame, Shield 0 dame
                             if id(enemy) not in player.already_hit_enemies and not enemy.invincible:
                                 knockback_dir = 1 if player.facing_right else -1
-                                enemy.take_damage(20, knockback_dir)
+                                damage = 10 if player.weapon_type == "Martial" else 0
+                                if damage > 0:
+                                    enemy.take_damage(damage, knockback_dir)
                                 player.already_hit_enemies.add(id(enemy))
                         continue
                     # Nếu player đang tấn công bằng Shield thì không nhận sát thương từ enemy
@@ -748,13 +824,17 @@ def main():
                     else:
                         boss.update(level.platforms, dt_ms=last_dt_ms)
 
-                    # Boss firebreath damage to player
+                    # Boss attack damage to player
                     if boss and boss.attack_hitbox and not boss.attack_hitbox_did_damage:
-                        if boss.state == "attack1" and boss.frame_index in boss.skill_hit_frames:
-                            # Shield blocks
-                            if not (player.is_attacking and player.weapon_type == "Shield"):
-                                if player.rect.colliderect(boss.attack_hitbox):
-                                    player.take_damage(boss.skill_damage)
+                        # Shield blocks
+                        if not (player.is_attacking and player.weapon_type == "Shield"):
+                            if player.rect.colliderect(boss.attack_hitbox):
+                                # Damage phụ thuộc vào skill đang dùng
+                                if boss.state == "firebreath" and boss.frame_index in boss.skill_hit_frames:
+                                    player.take_damage(boss.skill_damage)  # 50 damage
+                                    boss.attack_hitbox_did_damage = True
+                                elif boss.state == "attack1" and boss.frame_index == boss.attack1_hit_frame:
+                                    player.take_damage(boss.attack1_damage)  # 20 damage
                                     boss.attack_hitbox_did_damage = True
 
                     # Va chạm cận chiến với boss
@@ -769,22 +849,25 @@ def main():
                                     hit_dict[boss_id] = set()
                                 if stage not in hit_dict[boss_id] and not boss.invincible:
                                     knockback_dir = 1 if player.facing_right else -1
+                                    # Kiếm: 20 dame
                                     boss.take_damage(20, knockback_dir)
                                     hit_dict[boss_id].add(stage)
                         else:
                             if id(boss) not in player.already_hit_enemies and not boss.invincible:
                                 knockback_dir = 1 if player.facing_right else -1
-                                boss.take_damage(20, knockback_dir)
+                                # Tay không: 10 dame, Shield: 0 dame
+                                damage = 10 if player.weapon_type == "Martial" else 0
+                                if damage > 0:
+                                    boss.take_damage(damage, knockback_dir)
                                 player.already_hit_enemies.add(id(boss))
 
                     # Va chạm đạn với boss
                     for proj in player.projectiles:
                         if boss and not boss.is_dead and proj.active and boss.rect.colliderect(proj.rect) and getattr(proj, "spawn_delay", 0) == 0:
                             proj.active = False
-                            if hasattr(proj, "speed"):
-                                boss.take_damage(100)
-                            else:
-                                boss.take_damage(10)
+                            # Magic hoặc projectile có thuộc tính speed (fireball) gây 100 dame, còn lại 10
+                            damage = 100 if (player.weapon_type == "Magic" or hasattr(proj, "speed")) else 10
+                            boss.take_damage(damage)
 
                     # Physical collision with boss does NOT deal damage here; only the firebreath hitbox should.
 
@@ -833,10 +916,8 @@ def main():
                         if proj.active and enemy.rect.colliderect(proj.rect) and getattr(proj, "spawn_delay", 0) == 0:
                             proj.active = False
                             # Nếu là Fireball thì gây sát thương lớn hơn
-                            if hasattr(proj, "speed"):
-                                enemy.take_damage(100)
-                            else:
-                                enemy.take_damage(10)
+                            damage = 100 if (player.weapon_type == "Magic" or hasattr(proj, "speed")) else 10
+                            enemy.take_damage(damage)
                             break
                 keys = pygame.key.get_pressed()
                 if keys[pygame.K_c] and player.energy >= 100 and not player.is_charging_energy and not player.special_active:
@@ -853,20 +934,8 @@ def main():
             enemy.render(screen)
         # Vẽ boss (nếu đang ở Level 3)
         if current_level == 2 and boss and not boss.is_dead:
-            boss.render(screen, debug=True)  # Bật debug để xem hitbox
+            boss.render(screen)
             boss.render_healthbar(screen)
-            # Optional debug overlay: draw boss attack hitbox
-            if SHOW_HITBOX and getattr(boss, 'attack_hitbox', None):
-                try:
-                    hb = boss.attack_hitbox
-                    # create a semi-transparent surface the size of the hitbox
-                    overlay = pygame.Surface((hb.width, hb.height), pygame.SRCALPHA)
-                    overlay.fill((255, 0, 0, 100))
-                    screen.blit(overlay, (hb.x, hb.y))
-                    # draw an outline for clarity
-                    pygame.draw.rect(screen, (255, 0, 0), hb, 2)
-                except Exception:
-                    pass
         player.render(screen)
         if npc_visible:
             npc.render(screen)
@@ -909,11 +978,11 @@ def main():
                 login_screen.auth_manager.update_user_progress(
                     score=current_score
                 )
-            retry_rect, btn_rect, weapon_rects, leaderboard_btn_rect = draw_game_over(screen, show_weapon_select)
+            retry_rect, btn_rect, weapon_rects, leaderboard_btn_rect = draw_game_over(screen, show_weapon_select, login_screen.auth_manager)
             if show_leaderboard:
                 draw_leaderboard(screen, login_screen.auth_manager)
         elif show_start_screen:
-            play_rect, btn_rect, weapon_rects = draw_start_screen(screen, show_weapon_select)
+            play_rect, btn_rect, weapon_rects, leaderboard_btn_rect, weapon_shop_btn_rect = draw_start_screen(screen, show_weapon_select, login_screen.auth_manager)
 
         # Luôn render dialogue system trên cùng
         dialogue_system.render(screen)

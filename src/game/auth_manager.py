@@ -74,6 +74,8 @@ class AuthManager:
             "email": email,
             "score": 0,
             "coins": 0,
+            "unlocked_weapons": [0],  # Vũ khí 0 (tay không) mở khóa mặc định
+            "selected_weapon": 0,  # Vũ khí đang chọn
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "last_login": ""
         }
@@ -181,3 +183,82 @@ class AuthManager:
             return True
         except Exception:
             return False
+
+    def unlock_weapon(self, weapon_id: int) -> tuple[bool, str]:
+        """Mở khóa vũ khí bằng XU. Trả về (success, message)."""
+        if not self.current_user:
+            return False, "Chưa đăng nhập!"
+        
+        user = self.find_user_by_username(self.current_user["username"])
+        if not user:
+            return False, "Không tìm thấy tài khoản!"
+        
+        # Khởi tạo nếu chưa có
+        if "unlocked_weapons" not in user:
+            user["unlocked_weapons"] = [0]
+        if "selected_weapon" not in user:
+            user["selected_weapon"] = 0
+        
+        # Kiểm tra đã mở khóa chưa
+        if weapon_id in user["unlocked_weapons"]:
+            return False, "Vũ khí đã được mở khóa!"
+        
+        # Kiểm tra có đủ xu không
+        coins = int(user.get("coins", 0) or 0)
+        if coins < 1:
+            return False, "Không đủ XU!"
+        
+        # Trừ xu và mở khóa
+        user["coins"] = coins - 1
+        user["unlocked_weapons"].append(weapon_id)
+        self.current_user = user
+        self.save_accounts()
+        
+        return True, f"Đã mở khóa vũ khí!"
+
+    def select_weapon(self, weapon_id: int) -> bool:
+        """Chọn vũ khí để sử dụng."""
+        if not self.current_user:
+            return False
+        
+        user = self.find_user_by_username(self.current_user["username"])
+        if not user:
+            return False
+        
+        if "unlocked_weapons" not in user:
+            user["unlocked_weapons"] = [0]
+        
+        # Chỉ cho chọn vũ khí đã mở khóa
+        if weapon_id not in user["unlocked_weapons"]:
+            return False
+        
+        user["selected_weapon"] = weapon_id
+        self.current_user = user
+        self.save_accounts()
+        return True
+
+    def is_weapon_unlocked(self, weapon_id: int) -> bool:
+        """Kiểm tra vũ khí đã được mở khóa chưa."""
+        if not self.current_user:
+            return weapon_id == 0  # Chỉ vũ khí 0 miễn phí
+        
+        user = self.find_user_by_username(self.current_user["username"])
+        if not user:
+            return weapon_id == 0
+        
+        if "unlocked_weapons" not in user:
+            user["unlocked_weapons"] = [0]
+            self.save_accounts()
+        
+        return weapon_id in user["unlocked_weapons"]
+
+    def get_selected_weapon(self) -> int:
+        """Lấy ID vũ khí đang được chọn."""
+        if not self.current_user:
+            return 0
+        
+        user = self.find_user_by_username(self.current_user["username"])
+        if not user:
+            return 0
+        
+        return user.get("selected_weapon", 0)
