@@ -5,7 +5,7 @@ Config cho game settings
 # Game settings
 GAME_SETTINGS = {
     "FPS": 60,
-    "MOVEMENT_SPEED": 3,  # Tốc độ di chuyển (pixels per frame)
+    "MOVEMENT_SPEED": 4.5,  # Tốc độ di chuyển (pixels per frame) — increased by 50%
     "JUMP_SPEED": -15,    # Tốc độ nhảy (âm vì đi lên)
     "JUMP_COOLDOWN": 200, # Milliseconds giữa các lần nhảy
     "GRAVITY": 1,         # Trọng lực

@@ -11,10 +11,16 @@ from game.npc import NPC
 from game.login_screen import LoginScreen
 from game.auth_manager import AuthManager
 from game.config import GAME_SETTINGS
+from game.boss import Boss
 import os
 
 # Initialize Pygame
 pygame.init()
+
+# Testing helper: set to True to skip the login screen for faster testing.
+# You can also control this via environment variable SKIP_LOGIN=1 if preferred.
+# Restore default behavior: do not skip login screen.
+SKIP_LOGIN = False
 
 # Set up the game window
 screen_width = 800
@@ -37,7 +43,11 @@ clouds = [
     {"x": 550, "y": 300, "speed": 0.35, "img": cloud1_img},
 ]
 
+# Toggle to draw boss firebreath hitbox overlay for debugging (semi-transparent)
+SHOW_HITBOX = True
+
 clock = pygame.time.Clock()
+last_dt_ms = 16
 
 level_data_list = [
     [
@@ -56,6 +66,10 @@ level_data_list = [
         {'type': 'platform', 'x': 450, 'y': 180, 'width': 120, 'height': 30},
         {'type': 'platform', 'x': 250, 'y': 95, 'width': 40, 'height': 40},
         {'type': 'platform', 'x': 290, 'y': 95, 'width': 40, 'height': 40},
+    ],
+    [
+        # Level 3: Chỉ có mặt đất, không có chướng ngại vật hay quái vật
+        {'type': 'platform', 'x': 0, 'y': 550, 'width': 800, 'height': 50},
     ]
 ]
 current_level = 0
@@ -78,6 +92,9 @@ def reset_enemies_for_level(level_idx):
             Enemy((120, 390), 100, move_range=(100, 220)),
             Enemy((550, 290), 100, move_range=(500, 680))
         ]
+    elif level_idx == 2:
+        # Level 3: không có quái vật
+        return []
     return []
 
 def get_enemies_for_level(level_idx):
@@ -119,6 +136,7 @@ killed_enemies_per_level = [set() for _ in range(len(level_data_list))]
 
 current_level = 0
 enemies = get_enemies_for_level(current_level)
+boss = None
 
 weapon_types = [
     {"name": "Martial", "img": pygame.image.load(os.path.join(base_path, "type-martial.png")).convert_alpha()},
@@ -193,6 +211,24 @@ def draw_game_over(screen, show_weapon_select):
             screen.blit(img, rect.topleft)
             weapon_rects.append(rect)
     return retry_rect, btn_rect, weapon_rects, leaderboard_btn_rect
+
+def draw_victory_overlay(screen):
+    overlay = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 200))
+    screen.blit(overlay, (0, 0))
+
+    font_path = os.path.join(os.path.dirname(__file__), "assets", "fonts", "DejaVuSans.ttf")
+    font_title = pygame.font.Font(font_path, 56)
+    font_btn = pygame.font.Font(font_path, 32)
+
+    text_title = font_title.render("CHIẾN THẮNG!", True, (255, 215, 0))
+    screen.blit(text_title, (screen.get_width()//2 - text_title.get_width()//2, 180))
+
+    btn_rect = pygame.Rect(screen.get_width()//2 - 140, 320, 280, 60)
+    pygame.draw.rect(screen, (90, 200, 120), btn_rect, border_radius=10)
+    text_btn = font_btn.render("Về màn chính", True, (0, 0, 0))
+    screen.blit(text_btn, text_btn.get_rect(center=btn_rect.center))
+    return btn_rect
 
 def draw_start_screen(screen, show_weapon_select):
     overlay = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
@@ -345,7 +381,7 @@ def restore_box_used(level, current_level):
 
 def init_game():
     """Khởi tạo game sau khi đăng nhập thành công"""
-    global current_level, level, enemies, player, items, coin_count, player_score, selected_weapon, killed_enemies_per_level
+    global current_level, level, enemies, player, items, coin_count, player_score, selected_weapon, killed_enemies_per_level, boss
     
     # Reset game state
     current_level = 0
@@ -364,16 +400,19 @@ def init_game():
     level = Level(level_data_list[current_level])
     enemies = get_enemies_for_level(current_level)
     items = []
+    boss = None
     
     # Reset killed enemies
     killed_enemies_per_level = [set() for _ in range(len(level_data_list))]
 
 def main():
-    global current_level, level, enemies, player, items, coin_count, player_score, selected_weapon, killed_enemies_per_level
+    global current_level, level, enemies, player, items, coin_count, player_score, selected_weapon, killed_enemies_per_level, boss, last_dt_ms
     
     # Khởi tạo màn hình đăng nhập
     login_screen = LoginScreen(screen_width, screen_height)
-    show_login = True
+    # Show login by default unless SKIP_LOGIN is set for testing
+    show_login = not SKIP_LOGIN
+    
     
     attack_cooldown = 0
     coin_count = 0
@@ -384,9 +423,14 @@ def main():
     show_weapon_select = False
     btn_rect = None
     show_start_screen = True
+    # Nếu SKIP_LOGIN bật, nhảy thẳng vào gameplay (bỏ qua màn Start)
+    if SKIP_LOGIN:
+        show_start_screen = False
     play_rect = None
     show_leaderboard = False
     leaderboard_btn_rect = None
+    show_victory = False
+    victory_btn_rect = None
 
     # Tạo dialogue system
     dialogue_system = DialogueSystem()
@@ -472,6 +516,23 @@ def main():
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     show_leaderboard = False
                     continue
+
+            # Xử lý màn Victory (ưu tiên cao)
+            if show_victory:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    # Trở về màn chính
+                    init_game()
+                    show_start_screen = True
+                    show_victory = False
+                    continue
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    mouse_pos = pygame.mouse.get_pos()
+                    if victory_btn_rect and victory_btn_rect.collidepoint(mouse_pos):
+                        init_game()
+                        show_start_screen = True
+                        show_victory = False
+                # Khi đang victory, không xử lý gameplay khác
+                continue
 
             # Xử lý click ở màn hình Start
             if show_start_screen:
@@ -669,6 +730,71 @@ def main():
                     if not enemy.is_dead and player.rect.colliderect(enemy.rect):
                         player.take_damage(20)
 
+                # Boss spawn/update tại Level 3 (index 2)
+                if current_level == 2:
+                    if boss is None:
+                        # Spawn boss: run 4f, attack 11f; tăng kích thước lên 180px (to hơn player 55px)
+                        boss = Boss(
+                            x=400,
+                            y=0,
+                            patrol_range=(150, 750),
+                            frame_count=4,
+                            attack_frame_count=11,
+                            target_height=180,
+                            baseline_offset=0,
+                            attack_drop_frames=()
+                        )
+                        boss.place_on_ground(level.platforms)
+                    else:
+                        boss.update(level.platforms, dt_ms=last_dt_ms)
+
+                    # Boss firebreath damage to player
+                    if boss and boss.attack_hitbox and not boss.attack_hitbox_did_damage:
+                        if boss.state == "attack1" and boss.frame_index in boss.skill_hit_frames:
+                            # Shield blocks
+                            if not (player.is_attacking and player.weapon_type == "Shield"):
+                                if player.rect.colliderect(boss.attack_hitbox):
+                                    player.take_damage(boss.skill_damage)
+                                    boss.attack_hitbox_did_damage = True
+
+                    # Va chạm cận chiến với boss
+                    skip_melee_boss = player.weapon_type == "Magic" and player.special_active
+                    if boss and not boss.is_dead and not skip_melee_boss and player.is_attacking and player.attack_hitbox and boss.rect.colliderect(player.attack_hitbox):
+                        if player.weapon_type == "Machate":
+                            stage = player.machate_attack_stage
+                            if stage > 0:
+                                hit_dict = player.already_hit_enemies
+                                boss_id = id(boss)
+                                if boss_id not in hit_dict:
+                                    hit_dict[boss_id] = set()
+                                if stage not in hit_dict[boss_id] and not boss.invincible:
+                                    knockback_dir = 1 if player.facing_right else -1
+                                    boss.take_damage(20, knockback_dir)
+                                    hit_dict[boss_id].add(stage)
+                        else:
+                            if id(boss) not in player.already_hit_enemies and not boss.invincible:
+                                knockback_dir = 1 if player.facing_right else -1
+                                boss.take_damage(20, knockback_dir)
+                                player.already_hit_enemies.add(id(boss))
+
+                    # Va chạm đạn với boss
+                    for proj in player.projectiles:
+                        if boss and not boss.is_dead and proj.active and boss.rect.colliderect(proj.rect) and getattr(proj, "spawn_delay", 0) == 0:
+                            proj.active = False
+                            if hasattr(proj, "speed"):
+                                boss.take_damage(100)
+                            else:
+                                boss.take_damage(10)
+
+                    # Physical collision with boss does NOT deal damage here; only the firebreath hitbox should.
+
+                    # Boss chết -> hiển thị Victory, cộng điểm
+                    if boss and boss.is_dead and not show_victory:
+                        player_score += 500
+                        if login_screen.auth_manager.is_logged_in():
+                            login_screen.auth_manager.add_score(500)
+                        show_victory = True
+
                 level.update()
 
                 if player.rect.right > screen_width:
@@ -725,6 +851,22 @@ def main():
         level.render(screen)
         for enemy in enemies:
             enemy.render(screen)
+        # Vẽ boss (nếu đang ở Level 3)
+        if current_level == 2 and boss and not boss.is_dead:
+            boss.render(screen, debug=True)  # Bật debug để xem hitbox
+            boss.render_healthbar(screen)
+            # Optional debug overlay: draw boss attack hitbox
+            if SHOW_HITBOX and getattr(boss, 'attack_hitbox', None):
+                try:
+                    hb = boss.attack_hitbox
+                    # create a semi-transparent surface the size of the hitbox
+                    overlay = pygame.Surface((hb.width, hb.height), pygame.SRCALPHA)
+                    overlay.fill((255, 0, 0, 100))
+                    screen.blit(overlay, (hb.x, hb.y))
+                    # draw an outline for clarity
+                    pygame.draw.rect(screen, (255, 0, 0), hb, 2)
+                except Exception:
+                    pass
         player.render(screen)
         if npc_visible:
             npc.render(screen)
@@ -776,8 +918,13 @@ def main():
         # Luôn render dialogue system trên cùng
         dialogue_system.render(screen)
 
+        # Victory overlay
+        if show_victory:
+            victory_btn_rect = draw_victory_overlay(screen)
+
         pygame.display.flip()
         clock.tick(GAME_SETTINGS["FPS"])
+        last_dt_ms = clock.get_time()
 
 if __name__ == "__main__":
     main()
